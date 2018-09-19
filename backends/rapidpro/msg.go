@@ -194,9 +194,10 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 	handler := courier.GetHandler(channel.ChannelType())
 	if handler != nil {
 		builder, isBuilder := handler.(courier.MediaDownloadRequestBuilder)
+		logrus.WithField("builder", builder).WithField("isBuilder", isBuilder).Debug("S3 debugging")
 		if isBuilder {
 			req, err = builder.BuildDownloadMediaRequest(ctx, channel, parsedURL.String())
-
+			logrus.WithField("req", req).Debug("S3 debugging")
 			// in the case of errors, we log the error but move onwards anyways
 			if err != nil {
 				logrus.WithField("channel_uuid", channel.UUID()).WithField("channel_type", channel.ChannelType()).WithField("media_url", mediaURL).WithError(err).Error("unable to build media download request")
