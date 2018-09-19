@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/courier/utils"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -246,6 +247,7 @@ func (h *handler) BuildDownloadMediaRequest(ctx context.Context, b courier.Backe
 		return nil, fmt.Errorf("Missing token for WA channel")
 	}
 
+	logrus.WithField("build_download_media_request", token).WithField("attachmentURL", attachmentURL).Debug("S3 debugging")
 	// set the access token as the authorization header
 	req, _ := http.NewRequest(http.MethodGet, attachmentURL, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
