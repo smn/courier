@@ -244,6 +244,7 @@ func resolveMediaURL(channel courier.Channel, mediaID string) (string, error) {
 func (h *handler) BuildDownloadMediaRequest(ctx context.Context, b courier.Backend, channel courier.Channel, attachmentURL string) (*http.Request, error) {
 	token := channel.StringConfigForKey(courier.ConfigAuthToken, "")
 	if token == "" {
+		logrus.WithField("missing token", token).WithField("attachmentURL", attachmentURL).Debug("S3 debugging")
 		return nil, fmt.Errorf("Missing token for WA channel")
 	}
 
