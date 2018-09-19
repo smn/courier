@@ -196,7 +196,7 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 		builder, isBuilder := handler.(courier.MediaDownloadRequestBuilder)
 		logrus.WithField("builder", builder).WithField("isBuilder", isBuilder).Debug("S3 debugging")
 		if isBuilder {
-			req, err = builder.BuildDownloadMediaRequest(ctx, channel, parsedURL.String())
+			req, err = builder.BuildDownloadMediaRequest(ctx, b, channel, parsedURL.String())
 			logrus.WithField("req", req).Debug("S3 debugging")
 			// in the case of errors, we log the error but move onwards anyways
 			if err != nil {
