@@ -365,7 +365,7 @@ func (h *handler) SendMsg(ctx context.Context, msg courier.Msg) (courier.MsgStat
 		}
 
 		// upload it to WhatsApp in exchange for a media id
-		logrus.WithField("Authorization", fmt.Sprintf("Bearer %s", token)).WithField("mimeType", mimeType).Debug("WA upload debugging")
+		logrus.WithField("Authorization", fmt.Sprintf("Bearer %s", token)).WithField("body length", len(s3rr.Body)).WithField("mimeType", mimeType).Debug("WA upload debugging")
 		waReq, _ := http.NewRequest(http.MethodPost, mediaURL, bytes.NewReader(s3rr.Body))
 		waReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		waReq.Header.Set("Content-Type", mimeType)
