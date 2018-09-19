@@ -117,9 +117,9 @@ func newMsg(direction MsgDirection, channel courier.Channel, urn urns.URN, text 
 }
 
 const insertMsgSQL = `
-INSERT INTO msgs_msg(org_id, uuid, direction, text, attachments, msg_count, error_count, high_priority, status, 
+INSERT INTO msgs_msg(org_id, uuid, direction, text, attachments, msg_count, error_count, high_priority, status,
                      visibility, external_id, channel_id, contact_id, contact_urn_id, created_on, modified_on, next_attempt, queued_on, sent_on)
-              VALUES(:org_id, :uuid, :direction, :text, :attachments, :msg_count, :error_count, :high_priority, :status, 
+              VALUES(:org_id, :uuid, :direction, :text, :attachments, :msg_count, :error_count, :high_priority, :status,
                      :visibility, :external_id, :channel_id, :contact_id, :contact_urn_id, :created_on, :modified_on, :next_attempt, :queued_on, :sent_on)
 RETURNING id
 `
@@ -164,7 +164,7 @@ func writeMsgToDB(ctx context.Context, b *backend, m *DBMsg) error {
 }
 
 const selectMsgSQL = `
-SELECT org_id, direction, text, attachments, msg_count, error_count, high_priority, status, 
+SELECT org_id, direction, text, attachments, msg_count, error_count, high_priority, status,
        visibility, external_id, channel_id, contact_id, contact_urn_id, created_on, modified_on, next_attempt, queued_on, sent_on
 FROM msgs_msg
 WHERE id = $1
@@ -224,6 +224,7 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 
 	mimeType := ""
 	extension := filepath.Ext(parsedURL.Path)
+	logrus.WithField("file path extension guess", extension).WithField("mediaURL", mediaURL)
 	if extension != "" {
 		extension = extension[1:]
 	}
@@ -231,12 +232,14 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 	// first try getting our mime type from the first 300 bytes of our body
 	fileType, err := filetype.Match(body[:300])
 	if fileType != filetype.Unknown {
+		logrus.WithField("fileType guess", fileType.MIME.Value).WithField("extension", fileType.Extension).WithField("mediaURL", mediaURL)
 		mimeType = fileType.MIME.Value
 		extension = fileType.Extension
 	} else {
 		// if that didn't work, try from our extension
 		fileType = filetype.GetType(extension)
 		if fileType != filetype.Unknown {
+			logrus.WithField("extension guess", fileType.MIME.Value).WithField("extension", fileType.Extension).WithField("mediaURL", mediaURL)
 			mimeType = fileType.MIME.Value
 			extension = fileType.Extension
 		}
@@ -245,8 +248,10 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 	// we still don't know our mime type, use our content header instead
 	if mimeType == "" {
 		mimeType, _, _ = mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		logrus.WithField("Content-Type header guessing", mimeType).WithField("Content-Type", resp.Header.Get("Content-Type")).WithField("mediaURL", mediaURL)
 		if extension == "" {
 			extensions, err := mime.ExtensionsByType(mimeType)
+			logrus.WithField("extensions mimetype guessing", mimeType).WithField("extensions", extensions).WithField("mediaURL", mediaURL)
 			if extensions == nil || err != nil {
 				extension = ""
 			} else {
@@ -313,10 +318,10 @@ var luaMsgSeen = redis.NewScript(3, `-- KEYS: [Window, PrevWindow, URNFingerprin
 	local found = redis.call("hget", KEYS[1], KEYS[3])
 
 	-- didn't find it, try in our previous window
-	if not found then 
+	if not found then
 		found = redis.call("hget", KEYS[2], KEYS[3])
 	end
-	
+
 	-- return the fingerprint found
 	return found
 `)
