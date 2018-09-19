@@ -357,24 +357,16 @@ func (h *handler) SendMsg(ctx context.Context, msg courier.Msg) (courier.MsgStat
 
 		// retrieve the media to be sent from S3
 		req, _ := http.NewRequest(http.MethodGet, s3url, nil)
-		req.Header.Set("User-Agent", utils.HTTPUserAgent)
-
-		httpClient := utils.GetHTTPClient()
-		resp, err := httpClient.Do(req)
+		s3rr, err := utils.MakeHTTPRequest(req)
 		if err != nil {
-			logrus.WithError(err).Debug("WA upload debugging")
-			return nil, err
+			log := courier.NewChannelLogFromRR("Error downloading Media for sending", msg.Channel(), msg.ID(), s3rr).WithError("Message Send Error", err)
+			status.AddLog(log)
+			return status, err
 		}
 
-		// s3rr, err := utils.MakeHTTPRequest(req)
-		// if err != nil {
-		// 	log := courier.NewChannelLogFromRR("Error downloading Media for sending", msg.Channel(), msg.ID(), s3rr).WithError("Message Send Error", err)
-		// 	status.AddLog(log)
-		// 	return status, err
-		// }
-
 		// upload it to WhatsApp in exchange for a media id
-		waReq, _ := http.NewRequest(http.MethodPost, mediaURL, resp.Body)
+		logrus.WithField("Authorization", fmt.Sprintf("Bearer %s", token)).WithField("body length", len(s3rr.Body)).WithField("mimeType", mimeType).Debug("WA upload debugging")
+		waReq, _ := http.NewRequest(http.MethodPost, mediaURL, bytes.NewReader(s3rr.Body))
 		waReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		waReq.Header.Set("Content-Type", mimeType)
 		wArr, err := utils.MakeHTTPRequest(waReq)
