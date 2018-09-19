@@ -224,7 +224,7 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 
 	mimeType := ""
 	extension := filepath.Ext(parsedURL.Path)
-	logrus.WithField("file path extension guess", extension).WithField("mediaURL", mediaURL)
+	logrus.WithField("file path extension guess", extension).WithField("mediaURL", mediaURL).Debug("S3 debugging")
 	if extension != "" {
 		extension = extension[1:]
 	}
@@ -232,14 +232,14 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 	// first try getting our mime type from the first 300 bytes of our body
 	fileType, err := filetype.Match(body[:300])
 	if fileType != filetype.Unknown {
-		logrus.WithField("fileType guess", fileType.MIME.Value).WithField("extension", fileType.Extension).WithField("mediaURL", mediaURL)
+		logrus.WithField("fileType guess", fileType.MIME.Value).WithField("extension", fileType.Extension).WithField("mediaURL", mediaURL).Debug("S3 debugging")
 		mimeType = fileType.MIME.Value
 		extension = fileType.Extension
 	} else {
 		// if that didn't work, try from our extension
 		fileType = filetype.GetType(extension)
 		if fileType != filetype.Unknown {
-			logrus.WithField("extension guess", fileType.MIME.Value).WithField("extension", fileType.Extension).WithField("mediaURL", mediaURL)
+			logrus.WithField("extension guess", fileType.MIME.Value).WithField("extension", fileType.Extension).WithField("mediaURL", mediaURL).Debug("S3 debugging")
 			mimeType = fileType.MIME.Value
 			extension = fileType.Extension
 		}
@@ -248,10 +248,10 @@ func downloadMediaToS3(ctx context.Context, b *backend, channel courier.Channel,
 	// we still don't know our mime type, use our content header instead
 	if mimeType == "" {
 		mimeType, _, _ = mime.ParseMediaType(resp.Header.Get("Content-Type"))
-		logrus.WithField("Content-Type header guessing", mimeType).WithField("Content-Type", resp.Header.Get("Content-Type")).WithField("mediaURL", mediaURL)
+		logrus.WithField("Content-Type header guessing", mimeType).WithField("Content-Type", resp.Header.Get("Content-Type")).WithField("mediaURL", mediaURL).Debug("S3 debugging")
 		if extension == "" {
 			extensions, err := mime.ExtensionsByType(mimeType)
-			logrus.WithField("extensions mimetype guessing", mimeType).WithField("extensions", extensions).WithField("mediaURL", mediaURL)
+			logrus.WithField("extensions mimetype guessing", mimeType).WithField("extensions", extensions).WithField("mediaURL", mediaURL).Debug("S3 debugging")
 			if extensions == nil || err != nil {
 				extension = ""
 			} else {
