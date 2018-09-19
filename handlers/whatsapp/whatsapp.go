@@ -241,7 +241,7 @@ func resolveMediaURL(channel courier.Channel, mediaID string) (string, error) {
 }
 
 // BuildDownloadMediaRequest to download media for message attachment with Bearer token set
-func (h *handler) BuildDownloadMediaRequest(ctx context.Context, channel courier.Channel, attachmentURL string) (*http.Request, error) {
+func (h *handler) BuildDownloadMediaRequest(ctx context.Context, b courier.Backend, channel courier.Channel, attachmentURL string) (*http.Request, error) {
 	token := channel.StringConfigForKey(courier.ConfigAuthToken, "")
 	if token == "" {
 		logrus.WithField("missing token", token).WithField("attachmentURL", attachmentURL).Debug("S3 debugging")
@@ -367,8 +367,8 @@ func (h *handler) SendMsg(ctx context.Context, msg courier.Msg) (courier.MsgStat
 		// upload it to WhatsApp in exchange for a media id
 		logrus.WithField("Authorization", fmt.Sprintf("Bearer %s", token)).WithField("mimeType", mimeType).Debug("WA upload debugging")
 		waReq, _ := http.NewRequest(http.MethodPost, mediaURL, bytes.NewReader(s3rr.Body))
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		req.Header.Set("Content-Type", mimeType)
+		waReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		waReq.Header.Set("Content-Type", mimeType)
 		wArr, err := utils.MakeHTTPRequest(waReq)
 		if err != nil {
 			log := courier.NewChannelLogFromRR("Error uploading Media for sending", msg.Channel(), msg.ID(), wArr).WithError("Message Send Error", err)
