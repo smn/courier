@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/courier/utils"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -244,11 +243,9 @@ func resolveMediaURL(channel courier.Channel, mediaID string) (string, error) {
 func (h *handler) BuildDownloadMediaRequest(ctx context.Context, b courier.Backend, channel courier.Channel, attachmentURL string) (*http.Request, error) {
 	token := channel.StringConfigForKey(courier.ConfigAuthToken, "")
 	if token == "" {
-		logrus.WithField("missing token", token).WithField("attachmentURL", attachmentURL).Debug("S3 debugging")
 		return nil, fmt.Errorf("Missing token for WA channel")
 	}
 
-	logrus.WithField("build_download_media_request", token).WithField("attachmentURL", attachmentURL).Debug("S3 debugging")
 	// set the access token as the authorization header
 	req, _ := http.NewRequest(http.MethodGet, attachmentURL, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -365,7 +362,6 @@ func (h *handler) SendMsg(ctx context.Context, msg courier.Msg) (courier.MsgStat
 		}
 
 		// upload it to WhatsApp in exchange for a media id
-		logrus.WithField("Authorization", fmt.Sprintf("Bearer %s", token)).WithField("body length", len(s3rr.Body)).WithField("mimeType", mimeType).Debug("WA upload debugging")
 		waReq, _ := http.NewRequest(http.MethodPost, mediaURL, bytes.NewReader(s3rr.Body))
 		waReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		waReq.Header.Set("Content-Type", mimeType)
