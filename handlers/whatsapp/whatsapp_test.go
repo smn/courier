@@ -265,21 +265,21 @@ var defaultSendTestCases = []ChannelSendTestCase{
 		Status:       "E",
 		ResponseBody: `{ "errors": [{ "title": "Error Sending" }] }`, ResponseStatus: 403,
 		RequestBody: `{"to":"250788123123","type":"text","text":{"body":"Error"}}`,
-		Error:       "Received error from send endpoint: Error Sending",
+		Error:       "received error from send endpoint: Error Sending",
 		SendPrep:    setSendURL},
 	{Label: "No Message ID",
 		Text: "Error", URN: "whatsapp:250788123123",
 		Status:       "E",
 		ResponseBody: `{ "messages": [] }`, ResponseStatus: 200,
 		RequestBody: `{"to":"250788123123","type":"text","text":{"body":"Error"}}`,
-		Error:       "Unable to get message id from response body",
+		Error:       "unable to get message id from response body",
 		SendPrep:    setSendURL},
 	{Label: "Error Field",
 		Text: "Error", URN: "whatsapp:250788123123",
 		Status:       "E",
 		ResponseBody: `{ "errors": [{"title":"Error Sending"}] }`, ResponseStatus: 200,
 		RequestBody: `{"to":"250788123123","type":"text","text":{"body":"Error"}}`,
-		Error:       "Received error from send endpoint: Error Sending",
+		Error:       "received error from send endpoint: Error Sending",
 		SendPrep:    setSendURL},
 	{Label: "Audio Send",
 		Text:   "audio has no caption",
@@ -369,7 +369,6 @@ func TestSending(t *testing.T) {
 	mediaServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		res.WriteHeader(200)
-		fmt.Println("returning 200 with media body")
 		res.Write([]byte("media body"))
 	}))
 

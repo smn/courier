@@ -64,14 +64,14 @@ type eventPayload struct {
 		Text      struct {
 			Body string `json:"body"`
 		} `json:"text"`
-		Audio struct {
+		Audio *struct {
 			File     string `json:"file"`
 			ID       string `json:"id"`
 			Link     string `json:"link"`
 			MimeType string `json:"mime_type"`
 			Sha256   string `json:"sha256"`
 		} `json:"audio"`
-		Document struct {
+		Document *struct {
 			File     string `json:"file"`
 			ID       string `json:"id"`
 			Link     string `json:"link"`
@@ -79,7 +79,7 @@ type eventPayload struct {
 			Sha256   string `json:"sha256"`
 			Caption  string `json:"caption"`
 		} `json:"document"`
-		Image struct {
+		Image *struct {
 			File     string `json:"file"`
 			ID       string `json:"id"`
 			Link     string `json:"link"`
@@ -87,21 +87,21 @@ type eventPayload struct {
 			Sha256   string `json:"sha256"`
 			Caption  string `json:"caption"`
 		} `json:"image"`
-		Location struct {
+		Location *struct {
 			Address   string  `json:"address"`
 			Latitude  float32 `json:"latitude"`
 			Longitude float32 `json:"longitude"`
 			Name      string  `json:"name"`
 			URL       string  `json:"url"`
 		} `json:"location"`
-		Video struct {
+		Video *struct {
 			File     string `json:"file"`
 			ID       string `json:"id"`
 			Link     string `json:"link"`
 			MimeType string `json:"mime_type"`
 			Sha256   string `json:"sha256"`
 		} `json:"video"`
-		Voice struct {
+		Voice *struct {
 			File     string `json:"file"`
 			ID       string `json:"id"`
 			Link     string `json:"link"`
@@ -168,7 +168,7 @@ func (h *handler) receiveEvent(ctx context.Context, channel courier.Channel, w h
 			mediaURL, err = resolveMediaURL(channel, msg.Voice.ID)
 		} else {
 			// we received a message type we do not support.
-			courier.LogRequestError(r, channel, fmt.Errorf("Unsupported message type %s", msg.Type))
+			courier.LogRequestError(r, channel, fmt.Errorf("unsupported message type %s", msg.Type))
 		}
 
 		// create our message
@@ -220,15 +220,10 @@ func (h *handler) receiveEvent(ctx context.Context, channel courier.Channel, w h
 }
 
 func resolveMediaURL(channel courier.Channel, mediaID string) (string, error) {
-	token := channel.StringConfigForKey(courier.ConfigAuthToken, "")
-	if token == "" {
-		return "", fmt.Errorf("Missing token for WA channel")
-	}
-
 	urlStr := channel.StringConfigForKey(courier.ConfigBaseURL, "")
 	url, err := url.Parse(urlStr)
 	if err != nil {
-		return "", fmt.Errorf("Invalid base url set for WA channel: %s", err)
+		return "", fmt.Errorf("invalid base url set for WA channel: %s", err)
 	}
 
 	mediaPath, _ := url.Parse("/v1/media")
@@ -243,12 +238,13 @@ func resolveMediaURL(channel courier.Channel, mediaID string) (string, error) {
 func (h *handler) BuildDownloadMediaRequest(ctx context.Context, b courier.Backend, channel courier.Channel, attachmentURL string) (*http.Request, error) {
 	token := channel.StringConfigForKey(courier.ConfigAuthToken, "")
 	if token == "" {
-		return nil, fmt.Errorf("Missing token for WA channel")
+		return nil, fmt.Errorf("missing token for WA channel")
 	}
 
 	// set the access token as the authorization header
 	req, _ := http.NewRequest(http.MethodGet, attachmentURL, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("User-Agent", utils.HTTPUserAgent)
 	return req, nil
 }
 
@@ -267,14 +263,14 @@ var waStatusMapping = map[string]courier.MsgStatusValue{
 //     "body": "text message"
 //   }
 //	 "audio": {
-//	   "id": "the-audio-id"
+//     "id": "the-audio-id"
 // 	 }
 //	 "document": {
-//	   "id": "the-document-id"
+//     "id": "the-document-id"
 //     "caption": "the optional document caption"
 // 	 }
 //	 "image": {
-//	   "id": "the-image-id"
+//     "id": "the-image-id"
 //     "caption": "the optional image caption"
 // 	 }
 // }
@@ -287,30 +283,31 @@ type mtTextPayload struct {
 	} `json:"text"`
 }
 
+type mediaObject struct {
+	ID string `json:"id" validate:"required"`
+}
+
+type captionedMediaObject struct {
+	ID      string `json:"id" validate:"required"`
+	Caption string `json:"caption,omitempty"`
+}
+
 type mtAudioPayload struct {
-	To    string `json:"to"    validate:"required"`
-	Type  string `json:"type"  validate:"required"`
-	Audio struct {
-		ID string `json:"id" validate:"required"`
-	} `json:"audio"`
+	To    string       `json:"to"    validate:"required"`
+	Type  string       `json:"type"  validate:"required"`
+	Audio *mediaObject `json:"audio"`
 }
 
 type mtDocumentPayload struct {
-	To       string `json:"to"    validate:"required"`
-	Type     string `json:"type"  validate:"required"`
-	Document struct {
-		ID      string `json:"id" validate:"required"`
-		Caption string `json:"caption,omitempty"`
-	} `json:"document"`
+	To       string                `json:"to"    validate:"required"`
+	Type     string                `json:"type"  validate:"required"`
+	Document *captionedMediaObject `json:"document"`
 }
 
 type mtImagePayload struct {
-	To    string `json:"to"    validate:"required"`
-	Type  string `json:"type"  validate:"required"`
-	Image struct {
-		ID      string `json:"id" validate:"required"`
-		Caption string `json:"caption,omitempty"`
-	} `json:"image"`
+	To    string                `json:"to"    validate:"required"`
+	Type  string                `json:"type"  validate:"required"`
+	Image *captionedMediaObject `json:"image"`
 }
 
 // whatsapp only allows messages up to 4096 chars
@@ -338,88 +335,67 @@ func (h *handler) SendMsg(ctx context.Context, msg courier.Msg) (courier.MsgStat
 
 	status := h.Backend().NewMsgStatusForID(msg.Channel(), msg.ID(), courier.MsgErrored)
 
-	// TODO: figure out sending media
-	if len(msg.Attachments()) > 1 {
-		duration := time.Now().Sub(start)
-		err = fmt.Errorf("Message has %d attachments", len(msg.Attachments()))
-		courier.NewChannelLogFromError("WhatsApp only allows for a single attachment to a message.", msg.Channel(), msg.ID(), duration, err)
-		return status, err
+	if len(msg.Attachments()) > 0 {
+		for attachmentCount, attachment := range msg.Attachments() {
 
-	} else if len(msg.Attachments()) == 1 {
-
-		attachment := msg.Attachments()[0]
-		parts := strings.SplitN(attachment, ":", 2)
-		mimeType := parts[0]
-		s3url := parts[1]
-
-		// retrieve the media to be sent from S3
-		req, _ := http.NewRequest(http.MethodGet, s3url, nil)
-		s3rr, err := utils.MakeHTTPRequest(req)
-		if err != nil {
-			log := courier.NewChannelLogFromRR("Error downloading Media for sending", msg.Channel(), msg.ID(), s3rr).WithError("Message Send Error", err)
-			status.AddLog(log)
-			return status, err
-		}
-
-		// upload it to WhatsApp in exchange for a media id
-		waReq, _ := http.NewRequest(http.MethodPost, mediaURL, bytes.NewReader(s3rr.Body))
-		waReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		waReq.Header.Set("Content-Type", mimeType)
-		wArr, err := utils.MakeHTTPRequest(waReq)
-		if err != nil {
-			log := courier.NewChannelLogFromRR("Error uploading Media for sending", msg.Channel(), msg.ID(), wArr).WithError("Message Send Error", err)
-			status.AddLog(log)
-			return status, err
-		}
-		fmt.Println(string(wArr.Body[:]))
-
-		mediaID, err := jsonparser.GetString(wArr.Body, "media", "[0]", "id")
-		if err != nil {
-			log := courier.NewChannelLogFromRR("Unable to read Media ID from WhatsApp server response", msg.Channel(), msg.ID(), wArr).WithError("JSON error", err)
-			status.AddLog(log)
-			return status, err
-		}
-
-		externalID := ""
-		if strings.HasPrefix(mimeType, "audio") {
-			payload := mtAudioPayload{
-				To:   msg.URN().Path(),
-				Type: "audio",
+			mimeType, s3url := handlers.SplitAttachment(attachment)
+			mediaID, err := uploadMediaToWhatsApp(mediaURL, token, mimeType, s3url)
+			if err != nil {
+				duration := time.Now().Sub(start)
+				log := courier.NewChannelLogFromError("Unable to upload media to WhatsApp server", msg.Channel(), msg.ID(), duration, err)
+				status.AddLog(log)
+				return status, err
 			}
-			payload.Audio.ID = mediaID
-			externalID, err = sendWhatsAppMsg(sendURL, token, payload)
 
-		} else if strings.HasPrefix(mimeType, "application") {
-			payload := mtDocumentPayload{
-				To:   msg.URN().Path(),
-				Type: "document",
+			externalID := ""
+			if strings.HasPrefix(mimeType, "audio") {
+				payload := mtAudioPayload{
+					To:   msg.URN().Path(),
+					Type: "audio",
+				}
+				payload.Audio = &mediaObject{ID: mediaID}
+				externalID, err = sendWhatsAppMsg(sendURL, token, payload)
+
+			} else if strings.HasPrefix(mimeType, "application") {
+				payload := mtDocumentPayload{
+					To:   msg.URN().Path(),
+					Type: "document",
+				}
+
+				if attachmentCount == 0 {
+					payload.Document = &captionedMediaObject{ID: mediaID, Caption: msg.Text()}
+				} else {
+					payload.Document = &captionedMediaObject{ID: mediaID}
+				}
+				externalID, err = sendWhatsAppMsg(sendURL, token, payload)
+
+			} else if strings.HasPrefix(mimeType, "image") {
+				payload := mtImagePayload{
+					To:   msg.URN().Path(),
+					Type: "image",
+				}
+				if attachmentCount == 0 {
+					payload.Image = &captionedMediaObject{ID: mediaID, Caption: msg.Text()}
+				} else {
+					payload.Image = &captionedMediaObject{ID: mediaID}
+				}
+				externalID, err = sendWhatsAppMsg(sendURL, token, payload)
+
+			} else {
+				err = fmt.Errorf("unknown attachment mime type: %s", mimeType)
 			}
-			payload.Document.ID = mediaID
-			payload.Document.Caption = msg.Text()
-			externalID, err = sendWhatsAppMsg(sendURL, token, payload)
 
-		} else if strings.HasPrefix(mimeType, "image") {
-			payload := mtImagePayload{
-				To:   msg.URN().Path(),
-				Type: "image",
+			if err != nil {
+				// record our status and log
+				duration := time.Now().Sub(start)
+				log := courier.NewChannelLogFromError("Error sending message", msg.Channel(), msg.ID(), duration, err)
+				status.AddLog(log)
+				return status, err
 			}
-			payload.Image.ID = mediaID
-			payload.Image.Caption = msg.Text()
-			externalID, err = sendWhatsAppMsg(sendURL, token, payload)
 
-		} else {
-			err = fmt.Errorf("Unknown attachment mime type: %s", mimeType)
+			status.SetExternalID(externalID)
+
 		}
-
-		if err != nil {
-			// record our status and log
-			duration := time.Now().Sub(start)
-			log := courier.NewChannelLogFromError("Error sending message", msg.Channel(), msg.ID(), duration, err)
-			status.AddLog(log)
-			return status, err
-		}
-
-		status.SetExternalID(externalID)
 
 	} else {
 		parts := handlers.SplitMsg(msg.Text(), maxMsgLength)
@@ -451,6 +427,33 @@ func (h *handler) SendMsg(ctx context.Context, msg courier.Msg) (courier.MsgStat
 	return status, nil
 }
 
+func uploadMediaToWhatsApp(url string, token string, attachmentMimeType string, attachmentURL string) (string, error) {
+
+	// retrieve the media to be sent from S3
+	req, _ := http.NewRequest(http.MethodGet, attachmentURL, nil)
+	s3rr, err := utils.MakeHTTPRequest(req)
+	if err != nil {
+		return "", err
+	}
+
+	// upload it to WhatsApp in exchange for a media id
+	waReq, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(s3rr.Body))
+	waReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	waReq.Header.Set("Content-Type", attachmentMimeType)
+	waReq.Header.Set("User-Agent", utils.HTTPUserAgent)
+	wArr, err := utils.MakeHTTPRequest(waReq)
+	if err != nil {
+		return "", err
+	}
+
+	mediaID, err := jsonparser.GetString(wArr.Body, "media", "[0]", "id")
+	if err != nil {
+		return "", err
+	}
+
+	return mediaID, nil
+}
+
 func sendWhatsAppMsg(url string, token string, payload interface{}) (string, error) {
 
 	jsonBody, err := json.Marshal(payload)
@@ -462,19 +465,19 @@ func sendWhatsAppMsg(url string, token string, payload interface{}) (string, err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("User-Agent", utils.HTTPUserAgent)
 	rr, err := utils.MakeHTTPRequest(req)
 
 	errorTitle, err := jsonparser.GetString(rr.Body, "errors", "[0]", "title")
 	if errorTitle != "" {
-		err = errors.Errorf("Received error from send endpoint: %s", errorTitle)
+		err = errors.Errorf("received error from send endpoint: %s", errorTitle)
 		return "", err
 	}
 
 	// grab the id
 	externalID, err := jsonparser.GetString(rr.Body, "messages", "[0]", "id")
 	if err != nil {
-		fmt.Println(err)
-		err := errors.Errorf("Unable to get message id from response body")
+		err := errors.Errorf("unable to get message id from response body")
 		return "", err
 	}
 
